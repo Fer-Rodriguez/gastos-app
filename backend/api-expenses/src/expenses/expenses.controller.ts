@@ -21,6 +21,11 @@ export class ExpensesController {
     return this.service.create(dto);
   }
 
+  @Get('search')
+  search(@Query('query') query: string) {
+    return this.service.search(query);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(+id);

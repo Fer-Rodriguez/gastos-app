@@ -57,4 +57,20 @@ export class ExpensesService {
       },
     });
   }
+
+  async search(query: string) {
+    if (!query) {
+      return [];
+    }
+
+    return this.repo
+      .createQueryBuilder('expense')
+      .where('expense.deletedAt IS NULL')
+      .andWhere(
+        '(expense.description ILIKE :query OR expense.category ILIKE :query)',
+        { query: `%${query}%` },
+      )
+      .orderBy('expense.date', 'DESC')
+      .getMany();
+  }
 }
