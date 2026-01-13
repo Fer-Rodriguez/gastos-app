@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
+import { ExpensesModule } from './expenses/expenses.module';
 
 @Module({
   imports: [
+    ExpensesModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),
@@ -14,6 +16,7 @@ import { ConfigModule } from '@nestjs/config';
       synchronize: true,
       ssl: true,
     }),
+    ExpensesModule,
   ],
 })
 export class AppModule {}
