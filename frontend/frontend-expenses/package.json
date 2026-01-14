@@ -2,14 +2,13 @@
   "name": "frontend-expenses",
   "type": "module",
   "private": true,
-  "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
-    "vercel-build": "nuxt build"
-  },
+"scripts": {
+  "dev": "npx nuxt dev",
+  "build": "npx nuxt build",
+  "generate": "npx nuxt generate",
+  "preview": "npx nuxt preview",
+  "postinstall": "npx nuxt prepare"
+},
   "dependencies": {
     "@nuxt/ui": "^4.3.0",
     "nuxt": "^4.2.2",
