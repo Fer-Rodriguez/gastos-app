@@ -1,56 +1,52 @@
 <script setup lang="ts">
-import { useExpenses, type Expense } from '../../composables/useExpenses'
+type Expense = {
+  id: number
+  description: string
+  amount: number
+  category: string
+  date: string
+  deletedAt: string | null
+}
 
 const page = ref(1)
 const limit = ref(5)
-const search = ref('')
 
-const { getExpenses, searchExpenses } = useExpenses()
-
-const { data, refresh } = await getExpenses({
+const { data, pending, error } = useExpenses().getExpenses({
   page: page.value,
   limit: limit.value,
 })
 
 const rows = computed<Expense[]>(() => data.value?.[0] ?? [])
 const total = computed<number>(() => data.value?.[1] ?? 0)
-
-watch(search, async (value) => {
-  if (value.trim()) {
-    const result = await searchExpenses(value)
-    data.value = [result.data.value ?? [], total.value]
-  } else {
-    await refresh()
-  }
-})
-
-watch(page, async () => {
-  await refresh()
-})
 </script>
 
 <template>
-  <UContainer class="py-6 space-y-4">
-    <UInput
-      v-model="search"
-      placeholder="Buscar gasto por descripción o categoría..."
-      icon="i-heroicons-magnifying-glass"
-    />
+  <div class="p-6">
+    <h1 class="text-xl font-bold mb-4">Gastos</h1>
 
-    <UTable
-      :rows="rows"
-      :columns="[
-        { accessorKey: 'description', header: 'Descripción' },
-        { accessorKey: 'category', header: 'Categoría' },
-        { accessorKey: 'amount', header: 'Monto' },
-        { accessorKey: 'date', header: 'Fecha' },
-      ]"
-    />
+    <p v-if="pending">Cargando...</p>
+    <p v-if="error">Error al cargar gastos</p>
 
-    <UPagination
-      v-model="page"
-      :page-count="limit"
-      :total="total"
-    />
-  </UContainer>
+    <table v-if="rows.length" border="1" cellpadding="8">
+      <thead>
+        <tr>
+          <th>Descripción</th>
+          <th>Categoría</th>
+          <th>Monto</th>
+          <th>Fecha</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr v-for="expense in rows" :key="expense.id">
+          <td>{{ expense.description }}</td>
+          <td>{{ expense.category }}</td>
+          <td>{{ expense.amount }}</td>
+          <td>{{ expense.date }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p v-else>No hay gastos</p>
+  </div>
 </template>
