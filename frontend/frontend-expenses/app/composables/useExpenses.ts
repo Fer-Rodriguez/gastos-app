@@ -17,8 +17,26 @@ export const useExpenses = () => {
       body: payload,
     })
 
+  const updateExpense = (id: number, payload: {
+    description: string
+    amount: number
+    category: string
+    date: string
+  }) =>
+    useFetch(`${config.public.apiBase}/expenses/${id}`, {
+      method: 'PUT',
+      body: payload,
+    })
+
+  const deleteExpense = (id: number) =>
+    useFetch(`${config.public.apiBase}/expenses/${id}`, {
+      method: 'DELETE',
+    })
+
   return {
     getExpenses,
     createExpense,
+    updateExpense,
+    deleteExpense,
   }
 }
