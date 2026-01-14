@@ -5,8 +5,12 @@ import { ValidationPipe } from '@nestjs/common';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // ⚡ Habilitar CORS para desarrollo y producción
   app.enableCors({
-    origin: 'http://localhost:3000', // frontend
+    origin: [
+      'http://localhost:3000', // desarrollo local
+      'https://tu-front.vercel.app', // tu frontend en Vercel
+    ],
     credentials: true,
   });
 
