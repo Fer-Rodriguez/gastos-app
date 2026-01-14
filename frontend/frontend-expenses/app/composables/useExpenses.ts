@@ -4,10 +4,21 @@ export const useExpenses = () => {
   const getExpenses = (params: { page: number; limit: number }) =>
     useFetch<[any[], number]>(`${config.public.apiBase}/expenses`, {
       query: params,
-      server: false, // 👈 CLAVE para que salga en Network
+    })
+
+  const createExpense = (payload: {
+    description: string
+    amount: number
+    category: string
+    date: string
+  }) =>
+    useFetch(`${config.public.apiBase}/expenses`, {
+      method: 'POST',
+      body: payload,
     })
 
   return {
     getExpenses,
+    createExpense,
   }
 }

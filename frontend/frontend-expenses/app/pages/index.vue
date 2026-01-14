@@ -11,7 +11,7 @@ type Expense = {
 const page = ref(1)
 const limit = ref(5)
 
-const { data, pending, error } = useExpenses().getExpenses({
+const { data, pending, error, refresh } = useExpenses().getExpenses({
   page: page.value,
   limit: limit.value,
 })
@@ -27,6 +27,34 @@ const form = reactive({
   category: '',
   date: '',
 })
+
+const { createExpense } = useExpenses()
+
+const saveExpense = async () => {
+  if (!form.description || !form.amount || !form.category || !form.date) {
+    alert('Completa todos los campos')
+    return
+  }
+
+  await createExpense({
+    description: form.description,
+    amount: form.amount,
+    category: form.category,
+    date: form.date,
+  })
+
+  // limpiar formulario
+  form.description = ''
+  form.amount = null
+  form.category = ''
+  form.date = ''
+
+  // cerrar modal
+  isOpen.value = false
+
+  // refrescar lista
+  await refresh()
+}
 </script>
 
 <template>
@@ -149,6 +177,7 @@ const form = reactive({
           </button>
           <button
             type="button"
+            @click="saveExpense"
             style="padding: 10px 20px; background-color: #2563eb; color: white; border-radius: 6px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 500;"
           >
             Guardar
