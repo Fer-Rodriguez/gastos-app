@@ -7,6 +7,11 @@ export const useExpenses = () => {
       query: params,
     })
 
+  const getSearchExpenses = (params: {query: string }) =>
+    useFetch<any[]>(`${baseURL}/expenses/search`, {
+      query: params,
+    })
+
   const createExpense = (payload: {
     description: string
     amount: number
@@ -36,6 +41,7 @@ export const useExpenses = () => {
 
   return {
     getExpenses,
+    getSearchExpenses,
     createExpense,
     updateExpense,
     deleteExpense,

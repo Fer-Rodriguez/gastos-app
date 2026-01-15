@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useToast } from 'vue-toast-notification'
+const config = useRuntimeConfig()
+const baseURL = config.public.NUXT_PUBLIC_API_BASE || 'http://localhost:4000'
 
 type Expense = {
   id: number
@@ -14,14 +16,16 @@ const $toast = useToast()
 
 const page = ref(1)
 const limit = ref(10)
-const searchQuery = ref('')
+const searchValue = ref('')
 const selectedCategory = ref('')
+
+const { createExpense, updateExpense, deleteExpense, getExpenses, getSearchExpenses } = useExpenses()
 
 // Obtener datos reactivos
 const { data, pending, error, refresh } = await useAsyncData(
   'expenses',
   () => {
-    return $fetch<[Expense[], number]>('http://localhost:4000/expenses', {
+    return $fetch<[Expense[], number]>(`${baseURL}/expenses`, {
       query: {
         page: page.value,
         limit: limit.value,
@@ -33,7 +37,34 @@ const { data, pending, error, refresh } = await useAsyncData(
   }
 )
 
-const rows = computed<Expense[]>(() => data.value?.[0] ?? [])
+const { data: searchQueryActionData, pending: searchPending, error: searchError, refresh: searchRefresh } = await useAsyncData(
+  'expenses/search',
+  () => {
+     // Only fetch if there's a search value
+    if (!searchValue.value) {
+      return Promise.resolve([])
+    }
+    return $fetch<Expense[]>(`${baseURL}/expenses/search`, {
+      query: {
+        query: searchValue.value
+      }
+    })
+  },
+  {
+    watch: [searchValue]
+  }
+)
+
+// Use search results if search value exists, otherwise use regular data
+const rows = computed<Expense[]>(() => {
+  if (searchValue.value && (searchQueryActionData.value?.length || 0) > 0) {
+    console.log('searchQueryActionData', searchQueryActionData.value)
+    return searchQueryActionData.value ?? []
+  }
+  return data.value?.[0] ?? []
+})
+// let rows = computed<Expense[]>(() => data.value?.[0] ?? [])
+// rows = computed<Expense[]>(() => searchQueryActionData.value?.[0] ?? data.value?.[0] ?? [])
 const total = computed<number>(() => data.value?.[1] ?? 0)
 
 // Obtener categorías únicas
@@ -45,17 +76,6 @@ const categories = computed(() => {
 // Filtrar gastos por búsqueda y categoría
 const filteredRows = computed(() => {
   let filtered = rows.value
-
-  // Filtrar por búsqueda general
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(expense => 
-      expense.description.toLowerCase().includes(query) ||
-      expense.category.toLowerCase().includes(query) ||
-      expense.amount.toString().includes(query) ||
-      expense.date.includes(query)
-    )
-  }
 
   // Filtrar por categoría
   if (selectedCategory.value) {
@@ -80,8 +100,6 @@ const form = reactive({
   category: '',
   date: '',
 })
-
-const { createExpense, updateExpense, deleteExpense } = useExpenses()
 
 const openCreateModal = () => {
   isEditing.value = false
@@ -185,8 +203,12 @@ const changeLimit = async (newLimit: number) => {
   await refresh()
 }
 
+const movePage = async (pageNumber: number) => {
+  page.value = pageNumber
+  await refresh()
+}
+
 const clearFilters = () => {
-  searchQuery.value = ''
   selectedCategory.value = ''
 }
 </script>
@@ -239,6 +261,18 @@ const clearFilters = () => {
           </button>
         </div>
       </div>
+      <div>
+        <button
+        class="block w-full text-center px-2 py-1 text-xs hover:bg-gray-100"
+        @click="movePage(page = 1 ? 1 : page - 1)">
+        <
+        </button>
+        <button
+        class="block w-full text-center px-2 py-1 text-xs hover:bg-gray-100"
+        @click="movePage(page+1)">
+        >
+        </button>
+      </div>
     </div>
 
     <!-- Barra de búsqueda y filtros -->
@@ -246,9 +280,9 @@ const clearFilters = () => {
       <!-- Búsqueda general -->
       <div class="flex-1 min-w-[200px]">
         <input
-          v-model="searchQuery"
+          v-model="searchValue"
           type="text"
-          placeholder="Buscar en todos los campos..."
+          placeholder="Buscar descripción..."
           class="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
@@ -268,7 +302,7 @@ const clearFilters = () => {
 
       <!-- Botón limpiar filtros -->
       <button
-        v-if="searchQuery || selectedCategory"
+        v-if="selectedCategory"
         @click="clearFilters"
         class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
       >
