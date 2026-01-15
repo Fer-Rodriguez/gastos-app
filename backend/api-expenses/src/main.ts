@@ -9,7 +9,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:3000', // desarrollo local
-      'https://tu-front.vercel.app', // tu frontend en Vercel
+      'https://gastos-app-ew4w.vercel.app', // tu frontend en Vercel
     ],
     credentials: true,
   });
