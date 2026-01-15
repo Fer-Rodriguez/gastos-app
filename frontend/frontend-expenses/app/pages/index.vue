@@ -33,7 +33,9 @@ const { data, pending, error, refresh } = await useAsyncData(
     })
   },
   {
-    watch: [page, limit]
+    watch: [page, limit],
+    server: true, 
+    lazy: false    
   }
 )
 
