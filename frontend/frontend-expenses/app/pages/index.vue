@@ -22,22 +22,19 @@ const selectedCategory = ref('')
 const { createExpense, updateExpense, deleteExpense, getExpenses, getSearchExpenses } = useExpenses()
 
 // Obtener datos reactivos
-const { data, pending, error, refresh } = await useAsyncData(
-  'expenses',
-  () => {
-    return $fetch<[Expense[], number]>(`${baseURL}/expenses`, {
-      query: {
-        page: page.value,
-        limit: limit.value,
-      }
-    })
-  },
+const { data, pending, error, refresh } = await useFetch<[Expense[], number]>(
+  () => `${baseURL}/expenses`,
   {
+    query: {
+      page,
+      limit
+    },
     watch: [page, limit],
-    server: true, 
-    lazy: false    
+    server: false,  // Force client-side only
+    immediate: true
   }
 )
+
 
 const { data: searchQueryActionData, pending: searchPending, error: searchError, refresh: searchRefresh } = await useAsyncData(
   'expenses/search',
