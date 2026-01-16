@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { useToast } from 'vue-toast-notification'
-const config = useRuntimeConfig()
-const baseURL = config.public.NUXT_PUBLIC_API_BASE || 'http://localhost:4000'
 
 type Expense = {
   id: number
@@ -21,49 +19,74 @@ const selectedCategory = ref('')
 
 const { createExpense, updateExpense, deleteExpense, getExpenses, getSearchExpenses } = useExpenses()
 
-// Obtener datos reactivos
-const { data, pending, error, refresh } = await useFetch<[Expense[], number]>(
-  () => `${baseURL}/expenses`,
-  {
-    query: {
-      page,
-      limit
-    },
-    watch: [page, limit],
-    server: false,  // Force client-side only
-    immediate: true
-  }
-)
+// Estado de los datos de gastos
+const data = ref<[Expense[], number] | null>(null)
+const searchQueryActionData = ref<Expense[]>([])
+const pending = ref(false)
+const searchPending = ref(false)
 
-
-const { data: searchQueryActionData, pending: searchPending, error: searchError, refresh: searchRefresh } = await useAsyncData(
-  'expenses/search',
-  () => {
-     // Only fetch if there's a search value
-    if (!searchValue.value) {
-      return Promise.resolve([])
-    }
-    return $fetch<Expense[]>(`${baseURL}/expenses/search`, {
-      query: {
-        query: searchValue.value
-      }
+// Función de obtención de gastos
+const fetchExpenses = async () => {
+  pending.value = true
+  try {
+    const result = await getExpenses({ page: page.value, limit: limit.value })
+    data.value = result
+  } catch (error) {
+    console.error('Error fetching expenses:', error)
+    $toast.error('Error al cargar los gastos', {
+      position: 'top-right',
+      duration: 3000
     })
-  },
-  {
-    watch: [searchValue]
+  } finally {
+    pending.value = false
   }
-)
+}
 
-// Use search results if search value exists, otherwise use regular data
+// Obtener resultados de búsqueda
+const fetchSearchExpenses = async () => {
+  if (!searchValue.value) {
+    searchQueryActionData.value = []
+    return
+  }
+  
+  searchPending.value = true
+  try {
+    const result = await getSearchExpenses({ query: searchValue.value })
+    searchQueryActionData.value = result
+  } catch (error) {
+    console.error('Error searching expenses:', error)
+    $toast.error('Error al buscar gastos', {
+      position: 'top-right',
+      duration: 3000
+    })
+  } finally {
+    searchPending.value = false
+  }
+}
+
+// Carga inicial
+onMounted(() => {
+  fetchExpenses()
+})
+
+// Esté atento a los cambios de página/límite
+watch([page, limit], () => {
+  fetchExpenses()
+})
+
+// Esté atento a los cambios de búsqueda
+watch(searchValue, () => {
+  fetchSearchExpenses()
+})
+
+// Utilice los resultados de la búsqueda si existe valor de búsqueda; de lo contrario, utilice datos regulares
 const rows = computed<Expense[]>(() => {
   if (searchValue.value && (searchQueryActionData.value?.length || 0) > 0) {
-    console.log('searchQueryActionData', searchQueryActionData.value)
     return searchQueryActionData.value ?? []
   }
   return data.value?.[0] ?? []
 })
-// let rows = computed<Expense[]>(() => data.value?.[0] ?? [])
-// rows = computed<Expense[]>(() => searchQueryActionData.value?.[0] ?? data.value?.[0] ?? [])
+
 const total = computed<number>(() => data.value?.[1] ?? 0)
 
 // Obtener categorías únicas
@@ -83,6 +106,12 @@ const filteredRows = computed(() => {
 
   return filtered
 })
+
+// Asistente para formatear fechas
+const formatDate = (dateString: string) => {
+  if (!dateString) return ''
+  return dateString.split('T')[0]
+}
 
 const isOpen = ref(false)
 const isEditing = ref(false)
@@ -114,9 +143,18 @@ const openEditModal = (expense: Expense) => {
   isEditing.value = true
   editingId.value = expense.id
   form.description = expense.description
-  form.amount = expense.amount
+  form.amount = Number(expense.amount)
   form.category = expense.category
-  form.date = expense.date
+  
+  // Manejar diferentes formatos de fecha y convertir a AAAA-MM-DD
+  if (expense.date) {
+    const date = new Date(expense.date)
+    const isoString = date.toISOString().split('T')[0]
+    form.date = isoString || ''
+  } else {
+    form.date = ''
+  }
+  
   isOpen.value = true
 }
 
@@ -159,7 +197,7 @@ const saveExpense = async () => {
     form.category = ''
     form.date = ''
     isOpen.value = false
-    await refresh()
+    await fetchExpenses() // Actualizar datos después de guardar
   } catch (err) {
     $toast.error('Error al guardar el gasto. Intenta nuevamente.', {
       position: 'top-right',
@@ -185,7 +223,7 @@ const confirmDelete = async () => {
     })
     isDeleteModalOpen.value = false
     deleteId.value = null
-    await refresh()
+    await fetchExpenses() // Actualizar datos después de eliminarlos
   } catch (err) {
     $toast.error('Error al eliminar el gasto. Intenta nuevamente.', {
       position: 'top-right',
@@ -199,12 +237,12 @@ const changeLimit = async (newLimit: number) => {
   limit.value = newLimit
   page.value = 1
   showLimitDropdown.value = false
-  await refresh()
+  await fetchExpenses()
 }
 
 const movePage = async (pageNumber: number) => {
   page.value = pageNumber
-  await refresh()
+  await fetchExpenses()
 }
 
 const clearFilters = () => {
@@ -219,78 +257,30 @@ const clearFilters = () => {
     <div class="flex flex-wrap gap-4 items-center">
       <button 
         @click="openCreateModal"
-        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        style="padding: 10px 20px; background-color: #2563eb; color: white; border-radius: 6px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 500;"
       >
         Agregar gasto
       </button>
 
-      <!-- Dropdown de límite MUCHO MÁS PEQUEÑO -->
-      <div class="relative">
-        <button 
-          @click="showLimitDropdown = !showLimitDropdown"
-          class="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 flex items-center gap-1"
-        >
-          <span>{{ limit }}</span>
-          <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        
-        <div 
-          v-if="showLimitDropdown"
-          class="absolute top-full mt-1 bg-white border border-gray-300 rounded shadow-lg z-10 min-w-[60px]"
-        >
-          <button 
-            @click="changeLimit(10)"
-            class="block w-full text-center px-2 py-1 text-xs hover:bg-gray-100"
-          >
-            10
-          </button>
-          <button 
-            @click="changeLimit(50)"
-            class="block w-full text-center px-2 py-1 text-xs hover:bg-gray-100"
-          >
-            50
-          </button>
-          <button 
-            @click="changeLimit(100)"
-            class="block w-full text-center px-2 py-1 text-xs hover:bg-gray-100"
-          >
-            100
-          </button>
-        </div>
-      </div>
-      <div>
-        <button
-        class="block w-full text-center px-2 py-1 text-xs hover:bg-gray-100"
-        @click="movePage(page = 1 ? 1 : page - 1)">
-        <
-        </button>
-        <button
-        class="block w-full text-center px-2 py-1 text-xs hover:bg-gray-100"
-        @click="movePage(page+1)">
-        >
-        </button>
-      </div>
     </div>
 
     <!-- Barra de búsqueda y filtros -->
     <div class="flex flex-wrap gap-4 items-center">
       <!-- Búsqueda general -->
-      <div class="flex-1 min-w-[200px]">
+      <div style="width: 300px;">
         <input
           v-model="searchValue"
           type="text"
           placeholder="Buscar descripción..."
-          class="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; box-sizing: border-box; outline: none;"
         />
       </div>
 
       <!-- Filtro por categoría -->
-      <div class="min-w-[200px]">
+      <div style="width: 200px;">
         <select
           v-model="selectedCategory"
-          class="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; box-sizing: border-box; outline: none;"
         >
           <option value="">Todas las categorías</option>
           <option v-for="cat in categories" :key="cat" :value="cat">
@@ -303,15 +293,50 @@ const clearFilters = () => {
       <button
         v-if="selectedCategory"
         @click="clearFilters"
-        class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+        style="padding: 10px 20px; color: #374151; background-color: #f3f4f6; border-radius: 6px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 500;"
       >
         Limpiar filtros
       </button>
-    </div>
 
-    <!-- Contador de resultados -->
-    <div class="text-sm text-gray-600">
-      Mostrando {{ filteredRows.length }} de {{ rows.length }} gastos
+            <!-- Dropdown de límite -->
+      <div style="position: relative;">
+        <button 
+          @click="showLimitDropdown = !showLimitDropdown"
+          style="padding: 10px 20px; color: #374151; background-color: #f3f4f6; border-radius: 6px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 500; display: flex; align-items: center; gap: 8px;"
+        >
+          <span>{{ limit }}</span>
+          <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        <div 
+          v-if="showLimitDropdown"
+          style="position: absolute; top: 100%; margin-top: 4px; background-color: white; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); z-index: 10; min-width: 80px;"
+        >
+          <button 
+            @click="changeLimit(10)"
+            style="display: block; width: 100%; text-align: center; padding: 10px 20px; font-size: 0.875rem; background: none; border: none; cursor: pointer; color: #374151;"
+            :style="{ backgroundColor: limit === 10 ? '#f3f4f6' : 'transparent' }"
+          >
+            10
+          </button>
+          <button 
+            @click="changeLimit(50)"
+            style="display: block; width: 100%; text-align: center; padding: 10px 20px; font-size: 0.875rem; background: none; border: none; cursor: pointer; color: #374151;"
+            :style="{ backgroundColor: limit === 50 ? '#f3f4f6' : 'transparent' }"
+          >
+            50
+          </button>
+          <button 
+            @click="changeLimit(100)"
+            style="display: block; width: 100%; text-align: center; padding: 10px 20px; font-size: 0.875rem; background: none; border: none; cursor: pointer; color: #374151;"
+            :style="{ backgroundColor: limit === 100 ? '#f3f4f6' : 'transparent' }"
+          >
+            100
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- TABLA -->
@@ -331,18 +356,18 @@ const clearFilters = () => {
             <td class="p-2">{{ expense.description }}</td>
             <td class="p-2">{{ expense.category }}</td>
             <td class="p-2">{{ expense.amount }}</td>
-            <td class="p-2">{{ expense.date }}</td>
+            <td class="p-2">{{ formatDate(expense.date) }}</td>
             <td class="p-2">
               <div class="flex gap-2">
                 <button
                   @click="openEditModal(expense)"
-                  class="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm"
+                  style="padding: 10px 20px; background-color: #2563eb; color: white; border-radius: 6px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 500;"
                 >
                   Editar
                 </button>
                 <button
                   @click="openDeleteModal(expense.id)"
-                  class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                  style="padding: 10px 20px; background-color: #dc2626; color: white; border-radius: 6px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 500;"
                 >
                   Eliminar
                 </button>
@@ -355,6 +380,26 @@ const clearFilters = () => {
       <div v-else class="text-center py-8 text-gray-500">
         No se encontraron gastos con los filtros aplicados
       </div>
+    </div>
+    <!-- Contador de resultados -->
+    <div class="text-sm text-gray-600">
+      Mostrando {{ filteredRows.length }} de {{ rows.length }} gastos
+    </div>
+    <!-- Botones de paginación -->
+    <div style="display: flex; gap: 8px;">
+      <button
+        @click="movePage(page === 1 ? 1 : page - 1)"
+        style="padding: 10px 20px; color: #374151; background-color: #f3f4f6; border-radius: 6px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 500;"
+        :disabled="page === 1"
+      >
+        &lt;
+      </button>
+      <button
+        @click="movePage(page + 1)"
+        style="padding: 10px 20px; color: #374151; background-color: #f3f4f6; border-radius: 6px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 500;"
+      >
+        &gt;
+      </button>
     </div>
   </div>
 
@@ -407,6 +452,8 @@ const clearFilters = () => {
             <input
               v-model.number="form.amount"
               type="number"
+              step="0.01"
+              min="0.01"
               placeholder="Ej. 5000"
               style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; box-sizing: border-box; outline: none;"
             />
