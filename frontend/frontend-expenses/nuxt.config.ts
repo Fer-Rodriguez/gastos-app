@@ -2,7 +2,7 @@ export default defineNuxtConfig({
   modules: ['@nuxt/ui'],
   runtimeConfig: {
     public: {
-      apiBase: 'http://localhost:4000',
+      apiBase: 'https://gastos-app-6h3t.onrender.com',
     },
   },
 })
