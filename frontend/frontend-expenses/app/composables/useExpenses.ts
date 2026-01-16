@@ -1,6 +1,6 @@
 export const useExpenses = () => {
   const config = useRuntimeConfig()
-  const baseURL = config.public.NUXT_PUBLIC_API_BASE || 'http://localhost:4000'
+  const baseURL = config.public.apiBase || 'http://localhost:4000'
 
   const getExpenses = async (params: { page: number; limit: number }) => {
     return await $fetch<[any[], number]>(`${baseURL}/expenses`, {
